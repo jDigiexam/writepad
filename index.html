@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Writing and Math Pad</title>
+    <style>
+      /* --- Basic Reset & Layout --- */
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+        background-color: #ffffff;
+        color: #0f172a;
+      }
+
+      /* --- Progress Bar --- */
+      #progress-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background-color: #e2e8f0;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.3s ease;
+      }
+      #progress-container.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #progress-bar {
+        height: 100%;
+        width: 0%;
+        background-color: #2563eb;
+        transition: width 0.1s ease;
+      }
+      #progress-bar.indeterminate {
+        width: 50%;
+        animation: indeterminate 1.5s infinite linear;
+        transform-origin: 0% 50%;
+      }
+      @keyframes indeterminate {
+        0% { transform: translateX(-100%) scaleX(0.2); }
+        50% { transform: translateX(0%) scaleX(0.5); }
+        100% { transform: translateX(200%) scaleX(0.2); }
+      }
+
+      /* --- Header Toolbar --- */
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 24px;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+        z-index: 10;
+      }
+
+      .logo {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.5px;
+      }
+
+      .header-controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      button {
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: #334155;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      button:hover:not(:disabled) {
+        background: #f8fafc;
+        border-color: #94a3b8;
+      }
+
+      button.active {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+        color: #0f172a;
+      }
+
+      /* Primary Action Button (Recognize) */
+      #process-btn {
+        background: #2563eb;
+        color: white;
+        border: none;
+        font-weight: 600;
+      }
+      #process-btn:hover:not(:disabled) {
+        background: #1d4ed8;
+      }
+      #process-btn:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+
+      /* --- Segmented Mode Toggle --- */
+      .mode-toggle {
+        display: flex;
+        background: #f8fafc;
+        padding: 4px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+      }
+      .mode-btn {
+        background: transparent;
+        border: none;
+        color: #64748b;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .mode-btn:hover:not(.active) {
+        color: #334155;
+        background: transparent;
+        border-color: transparent;
+      }
+      .mode-btn.active {
+        background: white;
+        color: #2563eb;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-color: transparent;
+      }
+
+      /* --- Canvas Area (Ruled Notebook) --- */
+      #canvas-container {
+        flex-grow: 1;
+        position: relative;
+        background-color: #ffffff;
+        /* Red margin line & blue horizontal ruled lines */
+        background-image: 
+          linear-gradient(90deg, transparent 79px, #fca5a5 79px, #fca5a5 80px, transparent 80px),
+          linear-gradient(#f1f5f9 1px, transparent 1px);
+        background-size: 100% 100%, 100% 40px;
+        background-position: 0 0, 0 40px;
+        overflow: hidden;
+      }
+
+      #drawing-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        touch-action: none; /* Crucial: Prevents mobile pull-to-refresh while drawing */
+      }
+
+      /* --- Output Area --- */
+      .output-wrapper {
+        border-top: 1px solid #e2e8f0;
+        background: #ffffff;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .output-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 24px;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      #output-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #64748b;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      /* Master Output Box with Scrolling */
+      #output {
+        height: 30vh;
+        min-height: 200px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0;
+        resize: vertical;
+        background: #ffffff;
+      }
+
+      /* Individual Output Lines */
+      .output-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 12px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        gap: 16px;
+        transition: background-color 0.2s;
+      }
+      .output-line:hover {
+        background-color: #f8fafc;
+      }
+      .output-line:last-child {
+        border-bottom: none;
+      }
+      .output-text {
+        flex-grow: 1;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin-top: 2px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #0f172a;
+      }
+      .line-copy-btn {
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        color: #475569;
+        white-space: nowrap;
+        transition: all 0.2s;
+      }
+      .line-copy-btn:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #94a3b8;
+      }
+    </style>
+  </head>
+  
+  <body>
+    <!-- Top Loading Bar -->
+    <div id="progress-container" class="hidden">
+      <div id="progress-bar"></div>
+    </div>
+
+    <!-- Toolbar -->
+    <header>
+      <div class="logo">WritingPad</div>
+      <div class="header-controls">
+        <button id="pen-btn" class="active">✏️ Pen</button>
+        <button id="eraser-btn">🧹 Eraser</button>
+        <button id="clear-btn">Clear</button>
+        
+        <div class="mode-toggle">
+          <button id="mode-text" class="mode-btn active">General Text</button>
+          <button id="mode-math" class="mode-btn">Math (LaTeX)</button>
+        </div>
+        
+        <button id="process-btn">Recognize</button>
+      </div>
+    </header>
+
+    <!-- Canvas -->
+    <div id="canvas-container">
+      <canvas id="drawing-canvas"></canvas>
+    </div>
+
+    <!-- Output Section -->
+    <div class="output-wrapper">
+      <div class="output-header">
+        <span id="output-label">OUTPUT</span>
+        <!-- Master Copy All Button -->
+        <button id="copy-btn" disabled style="padding: 4px 12px; font-size: 12px; border-radius: 6px;">Copy All</button>
+      </div>
+      <div id="output">
+        <div style="padding: 16px 24px; color: #64748b; font-size: 14px;">
+          Write on the ruled pad above...
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

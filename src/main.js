@@ -424,6 +424,8 @@ worker.addEventListener('message', (event) => {
       outputDiv.innerHTML = '<div style="padding: 16px 24px; color: #64748b; font-size: 14px;">Write on the ruled pad above...</div>';
     }
 
+    processBtn.disabled = false;
+
   } else if (status === 'loading' || status === 'processing') {
     progressContainer.classList.remove('hidden');
     progressBar.classList.add('indeterminate');

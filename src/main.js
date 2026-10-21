@@ -30,8 +30,6 @@ let currentTool = 'pen';
 let currentMode = 'text';
 let isDrawing = false;
 let latestResult = '';
-let debounceTimer = null;
-const AUTO_RECOGNIZE_DELAY = 1200;
 
 // Initialize Model
 worker.postMessage({ type: 'init', mode: currentMode });
@@ -213,7 +211,6 @@ function eraseAtPoint(pos) {
 // Drawing Event Listeners
 const startDrawing = (e) => {
   isDrawing = true;
-  if (debounceTimer) clearTimeout(debounceTimer);
   const pos = getPos(e);
   if (currentTool === 'eraser') eraseAtPoint(pos);
   else { currentStroke = [pos]; redrawCanvas(); }
@@ -234,9 +231,6 @@ const stopDrawing = () => {
     strokes.push(currentStroke);
     currentStroke = null;
     redrawCanvas();
-    debounceTimer = setTimeout(() => { triggerRecognition(); }, AUTO_RECOGNIZE_DELAY);
-  } else if (currentTool === 'eraser') {
-    debounceTimer = setTimeout(() => { triggerRecognition(); }, AUTO_RECOGNIZE_DELAY);
   }
 };
 
@@ -249,7 +243,6 @@ canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, { 
 canvas.addEventListener('touchend', stopDrawing);
 
 clearBtn.addEventListener('click', () => {
-  if (debounceTimer) clearTimeout(debounceTimer);
   strokes = [];
   textBlocks = [];
   redrawCanvas();

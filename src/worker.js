@@ -9,14 +9,26 @@ const MATH_MODEL = 'Xenova/texify';
 let textRecognizerPromise = null;
 let mathRecognizerPromise = null;
 
-// Send download progress back to the UI
+// Track download progress per file
+const fileProgress = {};
+
 const progress_callback = (data) => {
-    if (data.status === 'progress') {
+    if (data.status === 'initiate') {
+        fileProgress[data.file] = 0;
+    } else if (data.status === 'progress') {
+        fileProgress[data.file] = data.progress;
+        
+        // Calculate the overall average progress across all downloading files
+        const progresses = Object.values(fileProgress);
+        const overallProgress = progresses.reduce((sum, p) => sum + p, 0) / progresses.length;
+
         self.postMessage({ 
             status: 'downloading', 
-            file: data.file, 
-            progress: data.progress 
+            file: 'Model files', 
+            progress: overallProgress 
         });
+    } else if (data.status === 'done') {
+        fileProgress[data.file] = 100;
     }
 };
 

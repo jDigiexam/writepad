@@ -194,50 +194,6 @@ function updateOutputBox() {
   latestResult = fullTextArray.join('\n');
 }
 
-// Gesture & Eraser Math
-function isScribbleGesture(stroke) {
-  if (stroke.length < 15) return false;
-  let xReversals = 0, prevDir = 0;
-  let minX = stroke[0].x, maxX = stroke[0].x, minY = stroke[0].y, maxY = stroke[0].y;
-
-  for (let i = 1; i < stroke.length; i++) {
-    const pt = stroke[i];
-    minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x);
-    minY = Math.min(minY, pt.y); maxY = Math.max(maxY, pt.y);
-    const dx = pt.x - stroke[i-1].x;
-    if (Math.abs(dx) > 2) {
-      const dir = Math.sign(dx);
-      if (prevDir !== 0 && dir !== prevDir) xReversals++;
-      prevDir = dir;
-    }
-  }
-  const width = maxX - minX, height = maxY - minY;
-  return xReversals >= 4 && width > 20 && (width / height) > 0.5;
-}
-
-function processScribbleErasure(scribbleStroke) {
-  let sMinX = Infinity, sMaxX = -Infinity, sMinY = Infinity, sMaxY = -Infinity;
-  for (const pt of scribbleStroke) {
-    sMinX = Math.min(sMinX, pt.x); sMaxX = Math.max(sMaxX, pt.x);
-    sMinY = Math.min(sMinY, pt.y); sMaxY = Math.max(sMaxY, pt.y);
-  }
-
-  strokes = strokes.filter(stroke => {
-    for (const pt of stroke) {
-      if (pt.x >= sMinX && pt.x <= sMaxX && pt.y >= sMinY && pt.y <= sMaxY) return false;
-    }
-    return true;
-  });
-
-  textBlocks = textBlocks.filter(block => {
-    const cx = (block.bounds.minX + block.bounds.maxX) / 2;
-    const cy = (block.bounds.minY + block.bounds.maxY) / 2;
-    return !(cx >= sMinX && cx <= sMaxX && cy >= sMinY && cy <= sMaxY);
-  });
-  
-  updateOutputBox();
-}
-
 function eraseAtPoint(pos) {
   const HIT_RADIUS = 15;
   strokes = strokes.filter(stroke => {
@@ -275,11 +231,7 @@ const stopDrawing = () => {
   isDrawing = false;
 
   if (currentTool === 'pen' && currentStroke) {
-    if (isScribbleGesture(currentStroke)) {
-      processScribbleErasure(currentStroke);
-    } else {
-      strokes.push(currentStroke);
-    }
+    strokes.push(currentStroke);
     currentStroke = null;
     redrawCanvas();
     debounceTimer = setTimeout(() => { triggerRecognition(); }, AUTO_RECOGNIZE_DELAY);
@@ -469,7 +421,7 @@ worker.addEventListener('message', (event) => {
     progressBar.classList.remove('indeterminate');
     progressBar.style.width = `${progress}%`;
     
-    outputDiv.innerHTML = `<div style="padding: 16px 24px;">Setting up the handwriting recognition resources...<br>${Math.round(progress)}% Complete</div>`;
+    outputDiv.innerHTML = `<div style="padding: 16px 24px;">Downloading AI Model (${file})...<br>${Math.round(progress)}% Complete</div>`;
     processBtn.disabled = true;
     copyBtn.disabled = true;
 

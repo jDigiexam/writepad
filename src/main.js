@@ -289,28 +289,36 @@ function getInkCanvas() {
 }
 
 function exportRegion(sourceCanvas, minX, minY, maxX, maxY) {
+  const rawW = maxX - minX;
   const rawH = maxY - minY;
   
-  // Dramatically increase padding to preserve aspect ratio
-  const padX = Math.max(60, Math.round(rawH * 0.8));
-  const padY = Math.max(60, Math.round(rawH * 0.8));
-
-  const startX = Math.max(0, minX - padX);
-  const startY = Math.max(0, minY - padY);
-  const endX = Math.min(sourceCanvas.width, maxX + padX);
-  const endY = Math.min(sourceCanvas.height, maxY + padY);
-
-  const cropW = endX - startX;
-  const cropH = endY - startY;
+  // 1. Add a base padding around the ink
+  const basePad = 40;
+  const paddedW = rawW + (basePad * 2);
+  const paddedH = rawH + (basePad * 2);
+  
+  // 2. Force a square canvas so TrOCR doesn't distort the aspect ratio
+  const size = Math.max(paddedW, paddedH);
+  
+  // 3. Calculate offsets to perfectly center the handwriting inside the square
+  const offsetX = (size - rawW) / 2;
+  const offsetY = (size - rawH) / 2;
 
   const exportCanvas = document.createElement('canvas');
-  exportCanvas.width = cropW;
-  exportCanvas.height = cropH;
+  exportCanvas.width = size;
+  exportCanvas.height = size;
   const exportCtx = exportCanvas.getContext('2d');
 
+  // Fill with solid white background
   exportCtx.fillStyle = '#ffffff';
-  exportCtx.fillRect(0, 0, cropW, cropH);
-  exportCtx.drawImage(sourceCanvas, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
+  exportCtx.fillRect(0, 0, size, size);
+  
+  // Draw the un-distorted ink into the exact center of the square
+  exportCtx.drawImage(
+    sourceCanvas, 
+    minX, minY, rawW, rawH, 
+    offsetX, offsetY, rawW, rawH
+  );
 
   return exportCanvas.toDataURL('image/png');
 }

@@ -73,7 +73,8 @@ self.addEventListener('message', async (event) => {
                     const results = [];
                     for (let i = 0; i < image_url.length; i++) {
                         self.postMessage({ status: 'processing', message: `Reading line ${i + 1} of ${image_url.length}...` });
-                        const output = await textRecognizer(image_url[i]);
+                        // Add beam search and token limits here
+                        const output = await textRecognizer(image_url[i], { num_beams: 3, max_new_tokens: 64 });
                         const text = output[0].generated_text.trim();
                         if (text) results.push(text);
                     }
@@ -82,7 +83,8 @@ self.addEventListener('message', async (event) => {
                 }
 
                 self.postMessage({ status: 'processing', message: 'Reading handwriting...' });
-                const output = await textRecognizer(image_url);
+                // And add them here for single-line processing
+                const output = await textRecognizer(image_url, { num_beams: 3, max_new_tokens: 64 });
                 self.postMessage({ status: 'complete', result: output[0].generated_text, mode: mode });
 
             } else if (mode === 'math') {

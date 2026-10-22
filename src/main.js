@@ -289,9 +289,11 @@ function getInkCanvas() {
 }
 
 function exportRegion(sourceCanvas, minX, minY, maxX, maxY) {
-  const padX = 30;
   const rawH = maxY - minY;
-  const padY = Math.max(25, Math.round(rawH * 0.3));
+  
+  // Dramatically increase padding to preserve aspect ratio
+  const padX = Math.max(60, Math.round(rawH * 0.8));
+  const padY = Math.max(60, Math.round(rawH * 0.8));
 
   const startX = Math.max(0, minX - padX);
   const startY = Math.max(0, minY - padY);

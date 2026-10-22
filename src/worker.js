@@ -8,7 +8,6 @@ const MATH_MODEL = 'Xenova/texify';
 let textRecognizerPromise = null;
 let mathRecognizerPromise = null;
 
-// Track download progress per file to prevent UI bouncing
 const fileProgress = {};
 
 const progress_callback = (data) => {
@@ -16,15 +15,9 @@ const progress_callback = (data) => {
         fileProgress[data.file] = 0;
     } else if (data.status === 'progress') {
         fileProgress[data.file] = data.progress;
-        
         const progresses = Object.values(fileProgress);
         const overallProgress = progresses.reduce((sum, p) => sum + p, 0) / progresses.length;
-
-        self.postMessage({ 
-            status: 'downloading', 
-            file: 'Model files', 
-            progress: overallProgress 
-        });
+        self.postMessage({ status: 'downloading', file: 'Model files', progress: overallProgress });
     } else if (data.status === 'done') {
         fileProgress[data.file] = 100;
     }
@@ -34,19 +27,35 @@ self.addEventListener('message', async (event) => {
     const { type, image_url, mode } = event.data;
 
     if (type === 'init') {
-        if (mode === 'text') {
-            if (!textRecognizerPromise) {
-                // webgpu natively supports fp16, WASM does not
-                textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'webgpu', dtype: 'fp16', progress_callback });
+        try {
+            if (mode === 'text') {
+                // Aggressively free memory from the math model
+                if (mathRecognizerPromise) {
+                    const mathModel = await mathRecognizerPromise;
+                    if (mathModel.dispose) await mathModel.dispose();
+                    mathRecognizerPromise = null;
+                }
+                if (!textRecognizerPromise) {
+                    textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'wasm', progress_callback });
+                }
+                await textRecognizerPromise;
+            } else if (mode === 'math') {
+                // Aggressively free memory from the text model
+                if (textRecognizerPromise) {
+                    const textModel = await textRecognizerPromise;
+                    if (textModel.dispose) await textModel.dispose();
+                    textRecognizerPromise = null;
+                }
+                if (!mathRecognizerPromise) {
+                    mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'wasm', progress_callback });
+                }
+                await mathRecognizerPromise;
             }
-            await textRecognizerPromise;
-        } else if (mode === 'math') {
-            if (!mathRecognizerPromise) {
-                mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'webgpu', dtype: 'fp16', progress_callback });
-            }
-            await mathRecognizerPromise;
+            self.postMessage({ status: 'ready', message: 'Model loaded and ready.' });
+        } catch (error) {
+            console.error(error);
+            self.postMessage({ status: 'complete', result: 'Error loading model: ' + error.message });
         }
-        self.postMessage({ status: 'ready', message: 'Model loaded and ready.' });
         return;
     }
 
@@ -54,7 +63,7 @@ self.addEventListener('message', async (event) => {
         try {
             if (mode === 'text') {
                 if (!textRecognizerPromise) {
-                    textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'webgpu', dtype: 'fp16', progress_callback });
+                    textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'wasm', progress_callback });
                 }
                 
                 self.postMessage({ status: 'loading', message: 'Loading text engine...' });
@@ -78,7 +87,7 @@ self.addEventListener('message', async (event) => {
 
             } else if (mode === 'math') {
                 if (!mathRecognizerPromise) {
-                    mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'webgpu', dtype: 'fp16', progress_callback });
+                    mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'wasm', progress_callback });
                 }
                 
                 self.postMessage({ status: 'loading', message: 'Loading math engine...' });
@@ -90,7 +99,7 @@ self.addEventListener('message', async (event) => {
             }
         } catch (error) {
             console.error(error);
-            self.postMessage({ status: 'complete', result: 'Error: Failed to process.', mode: mode });
+            self.postMessage({ status: 'complete', result: 'Error: Failed to process.' });
         }
     }
 });

@@ -341,8 +341,9 @@ function extractTextLinesWithBounds() {
   const inkCanvas = getInkCanvas();
   const width = inkCanvas.width, height = inkCanvas.height;
   const data = inkCanvas.getContext('2d').getImageData(0, 0, width, height).data;
+  
+  // 1. Find line bands (Y-axis)
   const rowDensity = new Array(height).fill(0);
-
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (data[(y * width + x) * 4 + 3] > 20) rowDensity[y]++;
@@ -351,7 +352,6 @@ function extractTextLinesWithBounds() {
 
   const lineBands = [];
   let inLine = false, lineStart = 0;
-
   for (let y = 0; y < height; y++) {
     if (rowDensity[y] > 2) {
       if (!inLine) { inLine = true; lineStart = y; }
@@ -365,25 +365,50 @@ function extractTextLinesWithBounds() {
   if (inLine && (height - lineStart >= 12)) lineBands.push({ minY: lineStart, maxY: height });
   if (lineBands.length === 0) return null;
 
-  const lines = [];
+  const words = [];
+  // A gap of 25+ pixels without ink will be treated as a space between words
+  const SPACE_THRESHOLD = 25; 
+
+  // 2. For each line, find word bands (X-axis gaps)
   for (const band of lineBands) {
-    let minX = width, maxX = 0;
-    for (let y = band.minY; y <= band.maxY; y++) {
-      for (let x = 0; x < width; x++) {
-        if (data[(y * width + x) * 4 + 3] > 20) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
+    const colDensity = new Array(width).fill(0);
+    for (let x = 0; x < width; x++) {
+      for (let y = band.minY; y <= band.maxY; y++) {
+        if (data[(y * width + x) * 4 + 3] > 20) colDensity[x]++;
+      }
+    }
+
+    let inWord = false, wordStart = 0, emptyCols = 0;
+    
+    for (let x = 0; x < width; x++) {
+      if (colDensity[x] > 0) {
+        if (!inWord) { inWord = true; wordStart = x; }
+        emptyCols = 0; // Reset empty space counter
+      } else {
+        if (inWord) {
+          emptyCols++;
+          if (emptyCols > SPACE_THRESHOLD) {
+            const wordMaxX = x - emptyCols;
+            if (wordMaxX - wordStart > 5) {
+              words.push({
+                image: exportRegion(inkCanvas, wordStart, band.minY, wordMaxX, band.maxY),
+                bounds: { minX: wordStart, maxX: wordMaxX, minY: band.minY, maxY: band.maxY }
+              });
+            }
+            inWord = false;
+          }
         }
       }
     }
-    if (minX <= maxX) {
-      lines.push({
-        image: exportRegion(inkCanvas, minX, band.minY, maxX, band.maxY),
-        bounds: { minX, maxX, minY: band.minY, maxY: band.maxY }
-      });
+    // Catch the final word on the line if it hits the edge
+    if (inWord && (width - 1 - wordStart > 5)) {
+       words.push({
+         image: exportRegion(inkCanvas, wordStart, band.minY, width - 1, band.maxY),
+         bounds: { minX: wordStart, maxX: width - 1, minY: band.minY, maxY: band.maxY }
+       });
     }
   }
-  return lines;
+  return words;
 }
 
 function triggerRecognition() {

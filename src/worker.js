@@ -1,6 +1,5 @@
 import { pipeline, env } from '@huggingface/transformers';
 
-// Force the worker to fetch from the Hugging Face CDN (caches locally after first download)
 env.allowLocalModels = false;
 
 const TEXT_MODEL = 'Xenova/trocr-base-handwritten';
@@ -9,7 +8,7 @@ const MATH_MODEL = 'Xenova/texify';
 let textRecognizerPromise = null;
 let mathRecognizerPromise = null;
 
-// Track download progress per file
+// Track download progress per file to prevent UI bouncing
 const fileProgress = {};
 
 const progress_callback = (data) => {
@@ -18,7 +17,6 @@ const progress_callback = (data) => {
     } else if (data.status === 'progress') {
         fileProgress[data.file] = data.progress;
         
-        // Calculate the overall average progress across all downloading files
         const progresses = Object.values(fileProgress);
         const overallProgress = progresses.reduce((sum, p) => sum + p, 0) / progresses.length;
 
@@ -38,12 +36,13 @@ self.addEventListener('message', async (event) => {
     if (type === 'init') {
         if (mode === 'text') {
             if (!textRecognizerPromise) {
-                textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'webgpu', progress_callback });
+                // Apply q8 and wasm to stay under Mac WebView memory limits during idle
+                textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'wasm', dtype: 'q8', progress_callback });
             }
             await textRecognizerPromise;
         } else if (mode === 'math') {
             if (!mathRecognizerPromise) {
-                mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'webgpu', progress_callback });
+                mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'wasm', dtype: 'q8', progress_callback });
             }
             await mathRecognizerPromise;
         }
@@ -55,10 +54,10 @@ self.addEventListener('message', async (event) => {
         try {
             if (mode === 'text') {
                 if (!textRecognizerPromise) {
-                    textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'webgpu', progress_callback });
+                    textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'wasm', dtype: 'q8', progress_callback });
                 }
                 
-                self.postMessage({ status: 'loading', message: 'Warming up GPU for text recognition...' });
+                self.postMessage({ status: 'loading', message: 'Loading text engine...' });
                 const textRecognizer = await textRecognizerPromise;
 
                 if (Array.isArray(image_url)) {
@@ -79,10 +78,10 @@ self.addEventListener('message', async (event) => {
 
             } else if (mode === 'math') {
                 if (!mathRecognizerPromise) {
-                    mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'webgpu', progress_callback });
+                    mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'wasm', dtype: 'q8', progress_callback });
                 }
                 
-                self.postMessage({ status: 'loading', message: 'Warming up GPU for math formulas (takes a few seconds)...' });
+                self.postMessage({ status: 'loading', message: 'Loading math engine...' });
                 const mathRecognizer = await mathRecognizerPromise;
                 
                 self.postMessage({ status: 'processing', message: 'Analyzing formula...' });

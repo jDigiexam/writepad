@@ -482,4 +482,20 @@ worker.addEventListener('message', (event) => {
       updateOutputBox(); 
     }
   }
+
+  // Handle macOS/WebKit backgrounding and wake-ups
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    // When the student switches back to the pad, the OS might have 
+    // cleared the canvas memory to save battery. Force a redraw.
+    resizeCanvas();
+    redrawCanvas();
+    
+    // Optionally ping the worker to ensure it is still alive
+    if (worker) {
+      worker.postMessage({ type: 'init', mode: currentMode });
+    }
+  }
+});
+
 });

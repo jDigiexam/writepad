@@ -36,13 +36,13 @@ self.addEventListener('message', async (event) => {
     if (type === 'init') {
         if (mode === 'text') {
             if (!textRecognizerPromise) {
-                // Apply fp16 and wasm to stay under Mac WebView memory limits during idle
-                textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'wasm', dtype: 'fp16', progress_callback });
+                // webgpu natively supports fp16, WASM does not
+                textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'webgpu', dtype: 'fp16', progress_callback });
             }
             await textRecognizerPromise;
         } else if (mode === 'math') {
             if (!mathRecognizerPromise) {
-                mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'wasm', dtype: 'fp16', progress_callback });
+                mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'webgpu', dtype: 'fp16', progress_callback });
             }
             await mathRecognizerPromise;
         }
@@ -54,7 +54,7 @@ self.addEventListener('message', async (event) => {
         try {
             if (mode === 'text') {
                 if (!textRecognizerPromise) {
-                    textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'wasm', dtype: 'fp16', progress_callback });
+                    textRecognizerPromise = pipeline('image-to-text', TEXT_MODEL, { device: 'webgpu', dtype: 'fp16', progress_callback });
                 }
                 
                 self.postMessage({ status: 'loading', message: 'Loading text engine...' });
@@ -78,7 +78,7 @@ self.addEventListener('message', async (event) => {
 
             } else if (mode === 'math') {
                 if (!mathRecognizerPromise) {
-                    mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'wasm', dtype: 'fp16', progress_callback });
+                    mathRecognizerPromise = pipeline('image-to-text', MATH_MODEL, { device: 'webgpu', dtype: 'fp16', progress_callback });
                 }
                 
                 self.postMessage({ status: 'loading', message: 'Loading math engine...' });
